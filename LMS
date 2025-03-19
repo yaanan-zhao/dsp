@@ -1,0 +1,48 @@
+%产生系统输入实白噪声
+ L = 100;                              %样本数目10000
+ sigma_v1_2 = 0.995;                   %噪声方差
+ 
+ % LSM  迭代算法
+ trials = 100;              %迭代次数 100
+ mu1 = 0.0005;
+ M = 2;  %  滤波器阶数
+ w11 = zeros(2,L);    %对应步长1的抽头权系数平均值
+ for m = 1 : trials
+   
+              v = sqrt(sigma_v1_2) * randn(L,trials);       %白噪声
+              
+              a1 = -0.99;             %模型系数
+              u = zeros(L,trials);  %初始化 u
+              u(1,m) = v(1,m);     %第一个输出信号
+            for k = 2 : L      %产生生成AR输出信号
+                      u(k,m) = -a1 * u(k - 1,m) + v(k,m);
+            end
+             u1=u(1,m);
+             w1 = zeros(2,L);    %对应步长1的抽头权系数
+             e1 = zeros(L,1);    %对应步长1的估计误差初始向量  
+             d1 = zeros(L,1);    %对应步长1的滤波器输出初始向量  
+%LSM迭代过程
+              for n = 4:L - 1
+                  w1(:,n + 1) = w1(:,n) + mu1 * u(n-1,m) * conj(e1(n)); %第m次迭代的权向量更新
+                  d1(n+1) = w1(1,n+1)'*u(n,1);       %期望信号的 估计
+                
+                  e1(n +1) = d1(n+1) - w1(n+1);  %估计误差
+              end
+                 w11 = w11 + w1;     %对应步长1的抽头权系数累加向量
+             
+ end
+              w11 = w11/trials;          %对应步长1的抽头权系数平均向量
+      t = 1 : L ;
+      u100=u(1,100);
+      figure;  
+      plot(t,w1(1,:),'y',t,w11(1,:),'k',t,w1(2,:),'y',t,w11(2,:),'k');
+     %axis( [0 10000 -0.2 1.1]);
+      title('步长0.05时权向量收敛曲线(M=2)');
+      xlabel('迭代次数');
+      ylabel('权向量');
+      legend('计算值','理论值');          %添加图例i
+      hold on;
+      figure; 
+      subplot(311),plot(u);title('原始信号');
+      subplot(312),plot(v);title('加噪信号');
+      subplot(313),plot(u);title('滤波信号');
