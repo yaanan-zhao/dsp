@@ -1,0 +1,130 @@
+function varargout = untitled(varargin)
+gui_Singleton = 1;
+gui_State = struct('gui_Name',       mfilename, ...
+                   'gui_Singleton',  gui_Singleton, ...
+                   'gui_OpeningFcn', @untitled_OpeningFcn, ...
+                   'gui_OutputFcn',  @untitled_OutputFcn, ...
+                   'gui_LayoutFcn',  [] , ...
+                   'gui_Callback',   []);
+if nargin & isstr(varargin{1})
+    gui_State.gui_Callback = str2func(varargin{1});
+end
+
+if nargout
+    [varargout{1:nargout}] = gui_mainfcn(gui_State, varargin{:});
+else
+    gui_mainfcn(gui_State, varargin{:});
+end
+
+function untitled_OpeningFcn(hObject, eventdata, handles, varargin)
+
+handles.output = hObject;
+
+guidata(hObject, handles);
+
+function varargout = untitled_OutputFcn(hObject, eventdata, handles)
+
+varargout{1} = handles.output;
+
+function pushbutton1_Callback(hObject, eventdata, handles)             %原语音信号采样
+clear sound
+[y,fs]=audioread('6.wav');         %默认采样频率22050Hz
+y=y(:,1);
+N=length(y);
+sound(y,fs);
+Y=fft(y,40000);     %采样点数40000
+axes(handles.axes1);
+plot(y);                         %原始语音信号频谱
+axis([1600 2000 -1 1]);
+axes(handles.axes2);
+plot(abs(Y));                    %原始信号频谱
+axis([0 20000 0 1500]);
+
+function pushbutton2_Callback(hObject, eventdata, handles)          %加入噪声信号（自己设定的正弦噪声）
+clear sound
+[y,fs]=audioread('6.wav');
+y=y(:,1);
+N=length(y);
+t=(0:N-1)/fs;
+n=0:N-1;
+f0=3500;
+s=sin(2*pi*f0/fs*n);   
+sound(s);
+axes(handles.axes3);
+plot(t,s);                        %噪声信号时域波形
+axis([0 0.001 -2 2]);
+spinpu=fft(s,N);
+Pyy=spinpu.*conj(spinpu)/N;
+halflength=floor(N/2);
+f=fs*(0:halflength)/N;
+axes(handles.axes4);
+plot(f,Pyy(1:halflength+1));      %噪音信号频谱
+axis([3000 4000 0 10]);
+
+function pushbutton3_Callback(hObject, eventdata, handles)           %将两种信号混合
+clear sound
+[y,fs]=audioread('6.wav');
+y=y(:,1);
+N=length(y);
+t=(0:N-1)/fs;
+n=0:N-1;
+f0=3500;
+s=sin(2*pi*f0/fs*n);       %噪声信号为高频正弦信号
+s=s';
+h=y+s;
+axes(handles.axes5);
+plot(h);                   %混合信号时域波形
+axis([1600 2000 -1 1]);
+H1=fft(h,40000);
+axes(handles.axes6);       %混合信号频谱
+plot(abs(H1));
+sound(h,fs); %播放混合信号
+
+function pushbutton4_Callback(hObject, eventdata, handles)          %将含有噪声的语音信号通过滤波器进行去噪处理
+clear sound
+[y,fs]=audioread('6.wav');
+y=y(:,1);
+N=length(y);
+t=(0:N-1)/fs;
+n=0:N-1;
+f0=3500;
+s=sin(2*pi*f0/fs*n);
+s=s';
+h=y+s;
+%低通滤波器
+wp=2100*2*pi;
+ws=2300*2*pi;
+Rp=2;Rs=15;
+[M,Wn]=buttord(wp,ws,Rp,Rs,'s');
+[Z,P,K]=buttap(M);
+[Bap,Aap]=zp2tf(Z,P,K);
+[b,a]=lp2lp(Bap,Aap,Wn);
+[bz,az]=bilinear(b,a,fs);
+[H,W]=freqz(bz,az);          
+hy=filter(bz,az,h);           %将混合信号通过低通滤波器后的响应
+axes(handles.axes7);
+plot(hy);                     %滤掉噪声后的信号时域波形
+axis([1600 2000 -1 1]);
+hyp=fft(hy,N);
+Pyy=hyp.*conj(hyp)/N;         %将混合信号通过低通滤波器滤除正弦噪声信号
+halflength=floor(N/2);
+f=fs*(0:halflength)/N;
+axes(handles.axes8);
+plot(f*4,Pyy(1:halflength+1)*100);    %去噪信号的频谱
+axis([2000 20000 0 1500]);
+sound(hy,fs);                 %播放还原声音
+
+function pushbutton6_Callback(hObject, eventdata, handles)       %设计巴特沃斯低通滤波器
+clear sound
+[y,fs]=audioread('6.wav');
+wp=2100*2*pi;             
+ws=2300*2*pi;                      %截止频率大约为2200Hz，设计前直接给出模拟指标
+Rp=2;Rs=15;
+[M,Wn]=buttord(wp,ws,Rp,Rs,'s');   %设计低通滤波器
+[Z,P,K]=buttap(M);
+[Bap,Aap]=zp2tf(Z,P,K);
+[b,a]=lp2lp(Bap,Aap,Wn);
+[bz,az]=impinvar(b,a,fs);          %用冲激响应不变换法实现模拟滤波器到数字滤波器的转换
+[H,W]=freqz(bz,az);
+axes(handles.axes9);
+plot(W*fs/(2*pi),abs(H));          %滤波器系统响应
